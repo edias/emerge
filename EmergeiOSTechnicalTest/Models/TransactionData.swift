@@ -13,3 +13,8 @@ struct TransactionData: Identifiable, Codable, Hashable {
     let approved: Bool
     var categoryName: String? = nil
 }
+
+extension TransactionData {
+    var formattedDate:  String { DateFormatterUtil.formatMediumDateTime(from: date) }
+    var formattedAmount: String { CurrencyFormatterUtil.format(amount) }
+}

@@ -22,7 +22,7 @@ struct TransactionDetailView: View {
                         Text("Amount:")
                             .fontWeight(.medium)
                         Spacer()
-                        Text(formatCurrencyInView(transaction.amount))
+                        Text(transaction.formattedAmount)
                             .fontWeight(.semibold)
                             .foregroundColor(transaction.amount < 0 ? .red : .primary)
                     }
@@ -46,7 +46,7 @@ struct TransactionDetailView: View {
                         Text("Date:")
                             .fontWeight(.medium)
                         Spacer()
-                        Text(formatDateInView(transaction.date))
+                        Text(transaction.formattedDate)
                             .foregroundColor(.secondary)
                     }
                     
@@ -64,7 +64,7 @@ struct TransactionDetailView: View {
                 .cornerRadius(12)
                 .shadow(radius: 2)
                 
-                if !transaction.approved {
+                if !transaction.approved && !viewModel.isLoading {
                     HStack(spacing: 16) {
                         Button("Approve") {
                             viewModel.approveTransaction(transaction)
@@ -80,21 +80,6 @@ struct TransactionDetailView: View {
         }
         .navigationTitle("Transaction")
         .navigationBarTitleDisplayMode(.inline)
-    }
-    
-    private func formatCurrencyInView(_ amount: Double) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.locale = Locale.current
-        return formatter.string(from: NSNumber(value: amount)) ?? "$0.00"
-    }
-    
-    private func formatDateInView(_ timestamp: TimeInterval) -> String {
-        let date = Date(timeIntervalSince1970: timestamp)
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        return formatter.string(from: date)
     }
 }
 

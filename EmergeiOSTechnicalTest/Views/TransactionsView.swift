@@ -5,8 +5,13 @@
 import SwiftUI
 
 struct TransactionsView: View {
-    @StateObject var viewModel = TransactionsViewModel()
-    
+
+    @StateObject private var viewModel: TransactionsViewModel
+
+    init(viewModel: TransactionsViewModel = TransactionsViewModel()) {
+        _viewModel = StateObject(wrappedValue: viewModel)
+    }
+
     var body: some View {
         NavigationStack {
             VStack {
@@ -17,8 +22,8 @@ struct TransactionsView: View {
                 if viewModel.isLoading {
                     ProgressView()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if let error = viewModel.error {
-                    Text("Error: \(error)")
+                } else if let errorMessage = viewModel.errorMessage {
+                    Text("Error: \(errorMessage)")
                         .foregroundColor(.red)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
@@ -30,7 +35,7 @@ struct TransactionsView: View {
             }
         }
         .task {
-            viewModel.loadTransactions()
+            await viewModel.loadTransactions()
         }
     }
 }
@@ -44,26 +49,18 @@ struct TransactionList: View {
             ForEach(transactions) { transaction in
                 TransactionRowView(
                     transaction: transaction,
-                    formattedDate: formatDate(transaction.date),
-                    formattedAmount: viewModel.formatCurrency(transaction.amount),
+                    formattedDate: transaction.formattedDate,
+                    formattedAmount: transaction.formattedAmount,
                     action: { viewModel.approveTransaction($0) }
                 )
                 .onTapGesture {
-                    viewModel.selectTransaction(transaction)
+                    viewModel.selectedTransaction = transaction
                 }
             }
         }
     }
-    
-    private func formatDate(_ timestamp: TimeInterval) -> String {
-        let date = Date(timeIntervalSince1970: timestamp)
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        return formatter.string(from: date)
-    }
 }
 
 #Preview {
-    TransactionsView(viewModel: TransactionsViewModel())
+    TransactionsView()
 }
