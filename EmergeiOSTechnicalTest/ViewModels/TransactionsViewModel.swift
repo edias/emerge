@@ -2,69 +2,76 @@
 //  Copyright © 2025 Emerge. All rights reserved.
 //
 
-import SwiftUI
+import Foundation
 
-class TransactionsViewModel: ObservableObject {
-    
+final class TransactionsViewModel: ObservableObject {
+
     @Published var transactions: [TransactionData] = []
     @Published var isLoading: Bool = false
-    @Published var error: String?
+    @Published var errorMessage: String?
     @Published var selectedTransaction: TransactionData? = nil
-    
-    private let repository: TransactionRepository = TransactionRepository(transactionAPI: MockTransactionAPI())
-    
-    private var currencyFormatter: NumberFormatter {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.locale = Locale.current
-        return formatter
-    }
-    
-    func loadTransactions() {
-        Task {
-            await MainActor.run {
-                isLoading = true
-            }
-            var transactions = try! await repository.getTransactions()
-            let categories = try! await repository.getCategories()
-            
-            for i in 0..<transactions.count {
-                transactions[i].categoryName = categories.first { $0.id == transactions[i].categoryId }?.name
-            }
-            
-            await MainActor.run {
-                self.transactions = transactions
-                isLoading = false
-            }
+
+    var error: TransactionsViewModelError? {
+        didSet {
+            errorMessage = error?.localizedDescription
         }
     }
-    
+
+    private let repository: TransactionRepositoryProtocol
+
+    init(repository: TransactionRepositoryProtocol = TransactionRepository()) {
+        self.repository = repository
+    }
+
+    @MainActor
+    func loadTransactions(suppressLoading: Bool = false) async {
+
+        if !suppressLoading {
+            isLoading = true
+            error = nil
+        }
+
+        defer { if !suppressLoading { isLoading = false } }
+
+        do {
+            self.transactions = try await repository.getEnrichedTransactions()
+        } catch {
+            self.error = .transactionsLoadError
+        }
+    }
+
+    @MainActor
     func approveTransaction(_ transaction: TransactionData) {
+
+        isLoading = true
+        error = nil
+
         Task {
-            await MainActor.run {
-                isLoading = true
-            }
-            try! await repository.approveTransaction(transaction: transaction)
-            
-            var transactions = try! await repository.getTransactions()
-            let categories = try! await repository.getCategories()
-            
-            for i in 0..<transactions.count {
-                transactions[i].categoryName = categories.first { $0.id == transactions[i].categoryId }?.name
-            }
-            
-            await MainActor.run {
-                self.transactions = transactions
-                isLoading = false
+
+            defer { isLoading = false }
+
+            do {
+                try await repository.approveTransaction(transaction: transaction)
+                await loadTransactions()
+            } catch {
+                self.error = .transactionApprovalError
+
             }
         }
     }
-    
-    func formatCurrency(_ amount: Double) -> String {
-        return currencyFormatter.string(from: NSNumber(value: amount)) ?? "$0.00"
-    }
-    
-    func selectTransaction(_ transaction: TransactionData) {
-        selectedTransaction = transaction
+}
+
+enum TransactionsViewModelError: LocalizedError {
+
+    case transactionsLoadError
+    case transactionApprovalError
+
+    var errorDescription: String? {
+        switch self {
+        case .transactionsLoadError:
+            return "Transactions were not able to load"
+        case .transactionApprovalError:
+            return "Transaction approval failed"
+        }
     }
 }
